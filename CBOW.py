@@ -2,27 +2,24 @@ import os
 import tensorflow as tf
 import re
 import numpy as np
-
+import math
+import time
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 DOC_NAME = os.listdir("Document")  # Document file name
-QUERY_NAME = os.listdir("Query")  # Query file name
 
-QUERY = []
 DOCUMENT = []
-BG = []
+VOC_DICT = {}
 
 WINDOW_SIZE = 1
-WORD_COUNT = 51252
+WORD_COUNT = 0
 
 
 def readfile():
-    global QUERY, DOCUMENT, BG
-    global QUERY_NAME, DOC_NAME
-
+    global DOCUMENT, DOC_NAME, WORD_COUNT, VOC_DICT
+    voc_id = 0
     # read document , create dictionary
     for doc_id in DOC_NAME:
-        doc_dict = {}
         with open("Document\\" + doc_id) as doc_file:
             doc_file_content = doc_file.read()
             doc_voc = re.split(' |\n', doc_file_content)
@@ -30,37 +27,21 @@ def readfile():
             doc_voc.remove('')
             del doc_voc[0:5]
             doc_voc = list(map(int, doc_voc))
-            # for dv_id, dv_voc in enumerate(doc_voc):
-            #     if dv_id < 5:
-            #         continue
-            #     if dv_voc in doc_dict:
-            #         doc_dict[dv_voc] += 1
-            #     else:
-            #         doc_dict[dv_voc] = 1
-            # if '' in doc_dict:  # ? error
-            #     doc_dict.pop('')
+            for voc in doc_voc:
+                if str(voc) not in VOC_DICT:
+                    VOC_DICT[str(voc)] = voc_id
+                    voc_id += 1
+
         DOCUMENT.append(doc_voc)
 
-    for query_id in QUERY_NAME:
-        query_dict = {}
-        with open("Query\\" + query_id) as query_file:
-            query_file_content = query_file.read()
-            query_voc = re.split(' |\n', query_file_content)
-            query_voc = list(filter('-1'.__ne__, query_voc))
-            for qv_id, qv_voc in enumerate(query_voc):
-                if qv_voc in query_dict:
-                    query_dict[qv_voc] += 1
-                else:
-                    query_dict[qv_voc] = 1
-            if '' in query_dict:  # ? error
-                query_dict.pop('')
-        QUERY.append(query_dict)
+    WORD_COUNT = len(VOC_DICT)
+
     print('read file down')
 
 
 def add_layer(inputs, input_tensors, output_tensors, activation_function=None):
-    w = tf.Variable(tf.random_normal([input_tensors, output_tensors]))
-    b = tf.Variable(tf.truncated_normal([output_tensors]))
+    w = tf.Variable(tf.random_normal([input_tensors, output_tensors], stddev=1.0 / math.sqrt(WORD_COUNT)), name='w')
+    b = tf.Variable(tf.zeros([output_tensors]), name='b')
     formula = tf.add(tf.matmul(inputs, w), b)  # matmul = dot
     if activation_function is None:
         outputs = formula
@@ -79,41 +60,72 @@ readfile()
 
 train_inputL = tf.placeholder(tf.int64, shape=[1])
 train_inputR = tf.placeholder(tf.int64, shape=[1])
-y_hat = tf.placeholder(tf.int64, shape=[1, WORD_COUNT])
+# y_hat = tf.placeholder(tf.float32, shape=[1, WORD_COUNT])
+y_hat = tf.placeholder(tf.int64, shape=[1, 1])
 
 
-cbow = tf.Variable(tf.random_uniform([50000, 100], -1.0, 1.0), name="cbow")
+cbow = tf.Variable(tf.random_uniform([WORD_COUNT, 100], -1.0, 1.0), name="cbow")
 cbowL = tf.nn.embedding_lookup(cbow, ids=train_inputL)
 cbowR = tf.nn.embedding_lookup(cbow, ids=train_inputR)
+average = tf.reduce_mean([cbowL, cbowR], 0, keep_dims=False)
+# prediction = add_layer(average, input_tensors=100, output_tensors=WORD_COUNT, activation_function=None)
+#
+# y_hat_onehot = tf.one_hot(y_hat, WORD_COUNT)
+# loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=prediction, labels=y_hat_onehot)
+# loss = tf.reduce_sum(loss, axis=1)
 
-average = tf.reduce_mean([cbowL, cbowR], 0)
-prediction = add_layer(average, input_tensors=100, output_tensors=WORD_COUNT, activation_function=tf.nn.softmax)
 
-loss = tf.nn.softmax_cross_entropy_with_logits(logits=prediction, labels=y_hat)
-train = tf.train.GradientDescentOptimizer(learning_rate=0.1).minimize(loss)
+nce_weights = tf.Variable(
+        tf.truncated_normal([WORD_COUNT, 100],
+                            stddev=1.0 / math.sqrt(100)))
+nce_biases = tf.Variable(tf.zeros([WORD_COUNT]))
+
+nce_loss = tf.reduce_mean(
+        tf.nn.nce_loss(weights=nce_weights,
+                       biases=nce_biases,
+                       labels=y_hat,        # ans
+                       inputs=average,      # embeding
+                       num_sampled=128,       # batch size
+                       num_classes=WORD_COUNT))     # ?
+
+optimizer = tf.train.AdagradOptimizer(learning_rate=0.01).minimize(nce_loss)
 
 init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
 
-
-
-for iteration in range(1):
+print(time.strftime("%D,%H:%M:%S"))
+for iteration in range(9999999):
     print(iteration)
+    cb_save = sess.run(cbow)
+
+    total_loss = 0
     for did, doc in enumerate(DOCUMENT):
+
         for wid, word in enumerate(doc):
             if wid < WINDOW_SIZE or wid > (len(doc)-WINDOW_SIZE-1):
                 continue
             # l_onehot = onehot(doc[wid - WINDOW_SIZE])
             # r_onehot = onehot(doc[wid + WINDOW_SIZE])
-            ans = onehot(word)
-            sess.run(train, feed_dict={train_inputL: [doc[wid - WINDOW_SIZE]], train_inputR: [doc[wid + WINDOW_SIZE]], y_hat: [ans]})
-        print(str(did) + '/2256')
-        # print(sess.run(prediction, feed_dict={train_inputL: [doc[wid - WINDOW_SIZE]], train_inputR: [doc[wid + WINDOW_SIZE]], y_hat: [ans]}))
-        break
+            il = VOC_DICT[str(doc[wid - WINDOW_SIZE])]
+            ir = VOC_DICT[str(doc[wid + WINDOW_SIZE])]
+            ans = VOC_DICT[str(word)]
 
-saver = tf.train.Saver({"cbow":cbow})
-save_path = saver.save(sess, "/work/IR/IR-HW5-CBOW/save/test.ckpt")
-print("Model saved in file: %s" % save_path)
+            _, loss = sess.run([optimizer, nce_loss], feed_dict={train_inputL: [il], train_inputR: [ir], y_hat: [[ans]]})
+            # print(loss)
+            total_loss += loss
+        if did % 100 == 0:
+            print(str(did) + '/2265')
+
+    print(total_loss)
+    if iteration % 10 == 0:
+        np.savetxt('./embedding/cbowADG_dict' + str(iteration) + '.txt', cb_save, delimiter=',')
+        print('save down')
+
+    print(time.strftime("%D,%H:%M:%S"))
+
+    # saver = tf.train.Saver()
+    # save_path = saver.save(sess, "/jupyter/IR/IR-HW5-CBOW/save/test.ckpt")
+    # print("Model saved in file: %s" % save_path)
 #
 
