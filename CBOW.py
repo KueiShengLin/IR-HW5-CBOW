@@ -9,7 +9,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 DOC_NAME = os.listdir("Document")  # Document file name
 
 DOCUMENT = []
-VOC_DICT = {}
+VOC_DICT = {}   # change 51252 words to 123xx id
 
 WINDOW_SIZE = 1
 WORD_COUNT = 0
@@ -18,7 +18,7 @@ WORD_COUNT = 0
 def readfile():
     global DOCUMENT, DOC_NAME, WORD_COUNT, VOC_DICT
     voc_id = 0
-    # read document , create dictionary
+    # read document , create word id dictionary
     for doc_id in DOC_NAME:
         with open("Document\\" + doc_id) as doc_file:
             doc_file_content = doc_file.read()
@@ -27,6 +27,7 @@ def readfile():
             doc_voc.remove('')
             del doc_voc[0:5]
             doc_voc = list(map(int, doc_voc))
+            # word's id create
             for voc in doc_voc:
                 if str(voc) not in VOC_DICT:
                     VOC_DICT[str(voc)] = voc_id
@@ -48,12 +49,6 @@ def add_layer(inputs, input_tensors, output_tensors, activation_function=None):
     else:
         outputs = activation_function(formula)
     return outputs
-
-
-def onehot(word):
-    code = [0] * WORD_COUNT
-    code[word] = 1
-    return code
 
 
 readfile()
@@ -85,7 +80,7 @@ nce_loss = tf.reduce_mean(
                        biases=nce_biases,
                        labels=y_hat,        # ans
                        inputs=average,      # embeding
-                       num_sampled=128,       # batch size
+                       num_sampled=128,       # negative sampled num
                        num_classes=WORD_COUNT))     # ?
 
 optimizer = tf.train.AdagradOptimizer(learning_rate=0.01).minimize(nce_loss)

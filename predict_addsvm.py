@@ -113,6 +113,8 @@ def VSMcos():
     d_vector_list = []
     d_vectordis_list = []
     old_q, old_d, old_q_dis, old_d_dis = old_vsm()
+
+    # query vector calculate
     for qid, q in enumerate(QUERY):
         q_vector = np.zeros([100])
         q_len = sum(q.values())
@@ -122,6 +124,7 @@ def VSMcos():
             ew = VOC_DICT[str(qw)]
             q_vector += (q[qw] / q_len) * EMBEDDING[ew]
 
+        # add pseudo relevant document
         for sudo in sudo_relevant[qid]:
             sudo_doc = DOCUMENT[DOC_NAME.index(sudo)]
             sudo_doc_len = sum(sudo_doc.values())
@@ -129,6 +132,7 @@ def VSMcos():
                 sew = VOC_DICT[str(sudo_doc_w)]
                 q_vector += (sudo_doc[sudo_doc_w] / sudo_doc_len) * EMBEDDING[sew]
 
+        # if q_vector doesn't have word in word embedding, give it the most frequency word
         if q_vector[0] == 0:
             inverse = [(value, key) for key, value in ALL_WORD.items()]
             top = max(inverse)[1]
@@ -141,6 +145,7 @@ def VSMcos():
         q_vectordis_list.append(q_vector_dis)
     print('q_vector down')
 
+    # document vector calculate
     for did, doc in enumerate(DOCUMENT):
         d_vector = np.zeros([100])
         d_len = sum(doc.values())
@@ -154,6 +159,7 @@ def VSMcos():
         d_vectordis_list.append(d_vector_dis)
     print('d_vector down')
 
+    # calculate cos (dsim = embedding, old_sim = hw1 ) NEW, OLD are weights, sim is final score
     for qvid, qv in enumerate(q_vector_list):
         sim = []
         for dvid, dv in enumerate(d_vector_list):
