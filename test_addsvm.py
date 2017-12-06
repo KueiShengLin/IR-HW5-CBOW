@@ -81,34 +81,6 @@ def ans_read(ans):
     return ans_list
 
 
-def old_vsm():
-    global VOC_DICT
-    global d_tfidf, q_tfidf, rel_tfidf
-    old_q, old_d = [], []
-    old_q_dis, old_d_dis = [], []
-    for qid, q in enumerate(q_tfidf):
-        q_seq = [0] * len(VOC_DICT)
-        for qw in q:
-            if qw in QUERY[qid]:
-                q_seq[VOC_DICT[qw]] = (1 - ROC_ALPHA) * q[qw]
-            else:
-                q_seq[VOC_DICT[qw]] = ROC_ALPHA * rel_tfidf[qid][qw] / 5
-
-        old_q.append(q_seq)
-        a = np.sum(pow(qv, 2) for qv in q_seq)
-        old_q_dis.append(math.sqrt(a))
-
-    for d in d_tfidf:
-        d_seq = [0] * len(VOC_DICT)
-        for dw in d:
-            d_seq[VOC_DICT[dw]] = d[dw]
-        old_d.append(d_seq)
-        b = np.sum(pow(dv, 2) for dv in d_seq)
-        old_d_dis.append(math.sqrt(b))
-
-    print('old_vs, down')
-    return old_q, old_d, old_q_dis, old_d_dis
-
 
 def VSMcos():
     global QUERY, DOCUMENT, EMBEDDING, VOC_DICT, ALL_WORD
@@ -118,7 +90,6 @@ def VSMcos():
     q_vectordis_list = []
     d_vector_list = []
     d_vectordis_list = []
-    # old_q, old_d, old_q_dis, old_d_dis = old_vsm()
 
     for qid, q in enumerate(QUERY):
         q_vector = np.zeros([100])
@@ -166,12 +137,6 @@ def VSMcos():
         sim = []
         for dvid, dv in enumerate(d_vector_list):
             dsim = dot(qv, dv) / (q_vectordis_list[qvid] * d_vectordis_list[dvid])
-            # k = (old_q_dis[qvid] * old_d_dis[dvid])
-            # if k == 0:
-            #     sim.append(dsim)
-            # else:
-                # old_dsim = sum(i[0] * i[1] for i in zip(old_d[dvid], old_q[qvid])) / k
-                # old_dsim = np.dot(old_d[dvid], old_q[qvid]) / k
             sim.append(NEW * dsim + OLD * old_cos[qvid][dvid])
         if qvid % 100 == 0:
             print(qvid)
