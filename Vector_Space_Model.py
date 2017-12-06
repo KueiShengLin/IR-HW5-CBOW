@@ -97,6 +97,7 @@ class VSM:
 
             for i in range(0, len(x)-1):
                 #u can add the tf compute there
+
                 #====================================
                 if(x[i] in Doc_idf):
                     Q_tfidf[j][x[i]] = self.query[j][x[i]]*Doc_idf[x[i]] #tf*idf
@@ -151,6 +152,7 @@ class VSM:
     def ROCCHIO(self, Doc_tfidf, Q_tfidf, rel_tfidf, alpha, beta, file_num):
 
         Ans_T = []
+        cos = []
         for q, old_que_dic in enumerate(Q_tfidf):
             if q % 100 == 0:
                 print(time.strftime("%D,%H:%M:%S"))
@@ -183,13 +185,13 @@ class VSM:
                 Sim.append(a / (math.sqrt(b)*math.sqrt(c)))
 
             Sim_sort = sorted(Sim, reverse=True)
-
+            cos.append(Sim)
             Ans = []
             for i in range(0, self.rank_amount):
                 Ans.append(self.doc_name[Sim.index(Sim_sort[i])])
             Ans_T.append(Ans)
 
-        return Ans_T
+        return Ans_T, cos
 
     def writeAns(self, file_name):
         with open(str(file_name) + '.txt', 'w') as file:
@@ -223,7 +225,7 @@ class VSM:
         print('tfidf down')
 
         start = time.time()
-        self.ans = self.ROCCHIO(Doc_tfidf, Q_tfidf, rel_tfidf, alpha, beta, file_num)
+        self.ans, _ = self.ROCCHIO(Doc_tfidf, Q_tfidf, rel_tfidf, alpha, beta, file_num)
         print('rocchio down')
         print(time.time() - start)
 
