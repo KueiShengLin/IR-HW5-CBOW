@@ -1,2 +1,0 @@
-model_checkpoint_path: "/work/IR/IR-HW5-CBOW/save/test.ckpt"
-all_model_checkpoint_paths: "/work/IR/IR-HW5-CBOW/save/test.ckpt"
